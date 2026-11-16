@@ -1,47 +1,71 @@
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/auth/admin_auth_screen.dart';
+import '../../features/auth/customer_auth_screen.dart';
+import '../../features/auth/role_selection_screen.dart';
 import '../../features/admin/admin_navigation_shell.dart';
 import '../../features/admin/bookings/admin_bookings_screen.dart';
 import '../../features/admin/customers/admin_customers_screen.dart';
 import '../../features/admin/dashboard/admin_dashboard_screen.dart';
 import '../../features/admin/reviews/admin_reviews_screen.dart';
 import '../../features/admin/settings/admin_settings_screen.dart';
-import '../../features/auth/admin_login_screen.dart';
-import '../../features/auth/admin_signup_screen.dart';
-import '../../features/auth/customer_login_screen.dart';
-import '../../features/auth/customer_signup_screen.dart';
-import '../../features/auth/role_selection_screen.dart';
 import '../../features/customer/booking/booking_calendar_flow_screen.dart';
 import '../../features/customer/explore/customer_explore_screen.dart';
 import '../../features/customer/home/customer_home_screen.dart';
 import '../../features/customer/profile/customer_profile_screen.dart';
+import '../../features/customer/customer_app_shell.dart';
+import '../auth/auth_state.dart';
 
-final GoRouter appRouter = createAppRouter();
+final authState = AuthState();
+final appRouter = createAppRouter(authState);
 
-GoRouter createAppRouter({String initialLocation = '/auth/role-selection'}) {
+GoRouter createAppRouter(AuthState auth, {String initialLocation = '/'}) {
   return GoRouter(
     initialLocation: initialLocation,
+    refreshListenable: auth,
+    redirect: (context, state) {
+      final loc = state.matchedLocation;
+
+      // Admin pages: must be signed in as admin
+      final isAdminArea = loc.startsWith('/admin') && loc != '/admin/login';
+      if (isAdminArea && !auth.isAdmin) return '/admin/login';
+
+      // Booking: must be signed in (browsing stays open)
+      if (loc == '/customer/booking' && !auth.isSignedIn) {
+        final from = Uri.encodeComponent(state.uri.toString());
+        return '/customer/login?from=$from';
+      }
+      return null;
+    },
     routes: [
       GoRoute(
-        path: '/auth/role-selection',
-        builder: (context, state) => const RoleSelectionScreen(),
+        path: '/',
+        builder: (context, state) => RoleSelectionScreen(
+          onRoleSelected: (role) {
+            context.go(
+              role == UserRole.admin ? '/admin/login' : '/customer/home',
+            );
+          },
+        ),
       ),
       GoRoute(
-        path: '/auth/admin/login',
-        builder: (context, state) => const AdminLoginScreen(),
+        path: '/admin/login',
+        builder: (context, state) => AdminAuthScreen(
+          onSubmit: (_) {
+            auth.signInAs(AuthRole.admin);
+            context.go('/admin/dashboard');
+          },
+        ),
       ),
       GoRoute(
-        path: '/auth/admin/signup',
-        builder: (context, state) => const AdminSignupScreen(),
-      ),
-      GoRoute(
-        path: '/auth/customer/login',
-        builder: (context, state) => const CustomerLoginScreen(),
-      ),
-      GoRoute(
-        path: '/auth/customer/signup',
-        builder: (context, state) => const CustomerSignupScreen(),
+        path: '/customer/login',
+        builder: (context, state) => CustomerAuthScreen(
+          onBack: () => context.go('/customer/home'),
+          onSubmit: () {
+            auth.signInAs(AuthRole.customer);
+            context.go(state.uri.queryParameters['from'] ?? '/customer/home');
+          },
+        ),
       ),
       ShellRoute(
         builder: (context, state, child) =>
@@ -61,9 +85,7 @@ GoRouter createAppRouter({String initialLocation = '/auth/role-selection'}) {
           ),
           GoRoute(
             path: '/admin/reviews',
-            builder: (context, state) => AdminReviewsScreen(
-              onBack: () => context.go('/admin/dashboard'),
-            ),
+            builder: (context, state) => const AdminReviewsScreen(),
           ),
           GoRoute(
             path: '/admin/settings',
@@ -71,31 +93,30 @@ GoRouter createAppRouter({String initialLocation = '/auth/role-selection'}) {
           ),
         ],
       ),
-      GoRoute(
-        path: '/customer/home',
-        builder: (context, state) => const CustomerHomeScreen(),
-      ),
-      GoRoute(
-        path: '/customer/explore',
-        builder: (context, state) => const CustomerExploreScreen(),
-      ),
-      GoRoute(
-        path: '/customer/booking/calendar',
-        builder: (context, state) => const BookingCalendarFlowScreen(),
-      ),
-      GoRoute(
-        path: '/customer/profile',
-        builder: (context, state) => const CustomerProfileScreen(),
+      ShellRoute(
+        builder: (context, state, child) =>
+            CustomerAppShell(location: state.uri.path, child: child),
+        routes: [
+          GoRoute(
+            path: '/customer/home',
+            builder: (context, state) => const CustomerHomeScreen(),
+          ),
+          GoRoute(
+            path: '/customer/explore',
+            builder: (context, state) => const CustomerExploreScreen(),
+          ),
+          GoRoute(
+            path: '/customer/booking',
+            builder: (context, state) => BookingCalendarFlowScreen(
+              initialSessionType: state.uri.queryParameters['category'],
+            ),
+          ),
+          GoRoute(
+            path: '/customer/profile',
+            builder: (context, state) => const CustomerProfileScreen(),
+          ),
+        ],
       ),
     ],
-    errorBuilder: (context, state) => Scaffold(
-      backgroundColor: const Color(0xFF121212),
-      body: Center(
-        child: Text(
-          'Page not found: ${state.uri.path}',
-          style: const TextStyle(color: Colors.white),
-        ),
-      ),
-    ),
   );
 }

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:photography_booking/core/theme/app_theme.dart';
 
-import '../../core/theme/app_theme.dart';
+import '../../core/theme/studio_tokens.dart';
 
 enum UserRole { customer, admin }
 

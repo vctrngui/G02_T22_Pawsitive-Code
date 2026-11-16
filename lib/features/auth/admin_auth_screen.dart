@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:photography_booking/core/theme/app_theme.dart';
 
+import '../../core/theme/studio_tokens.dart';
 import '../../core/widgets/back_navigation.dart';
-import '../../core/theme/app_theme.dart';
 
 enum AuthMode { signIn, signUp }
 
